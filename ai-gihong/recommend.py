@@ -12,7 +12,7 @@ CSV = BASE / "data" / "products.csv"
 EMBED_MODEL = "jhgan/ko-sroberta-multitask"
 
 W_INGREDIENT, W_SIMILARITY, W_RATING = 0.5, 0.3, 0.2
-M_REVIEWS = 100          # IMDb 가중 평점 기준 리뷰 수
+M_REVIEWS = 2000         # IMDb 가중 평점 기준 리뷰 수 (하위 25% 리뷰 수 수준)
 TOP_N = 5
 
 SYMPTOM_KR = {
@@ -73,13 +73,14 @@ def load_products():
         mx = df[f"sc_{s}"].max()
         df[f"nc_{s}"] = df[f"sc_{s}"] / mx if mx > 0 else 0.0
 
-    # IMDb 가중 평점
+    # IMDb 가중 평점 (영화 평점사이트에 사용되는 공식, 리뷰가 적으면 전체 평균 쪽으로 끌어당기는 공식임)
     rating = pd.to_numeric(df["rating"], errors="coerce")
     reviews = pd.to_numeric(df["reviews"], errors="coerce").fillna(0)
     c = rating.mean()
     df["adj_rating"] = ((reviews / (reviews + M_REVIEWS)) * rating.fillna(c)
                         + (M_REVIEWS / (reviews + M_REVIEWS)) * c)
-    df["adj_rating_n"] = df["adj_rating"] / 5.0
+    lo, hi = df["adj_rating"].min(), df["adj_rating"].max()
+    df["adj_rating_n"] = (df["adj_rating"] - lo) / (hi - lo) if hi > lo else 0.5
 
     df["text"] = df.apply(build_text, axis=1)
     df["price_num"] = pd.to_numeric(df["price"], errors="coerce").fillna(0)
